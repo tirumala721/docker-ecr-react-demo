@@ -1,0 +1,109 @@
+name: Docker Image CI
+
+on:
+
+  push:
+
+    branches: [ main ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout source code
+
+      uses: actions/checkout@v3
+
+      with:
+
+          ref: ${{ github.ref }}
+
+          fetch-depth: 0
+
+    - name: Get changed files
+
+      id: changed-files
+
+      uses: tj-actions/changed-files@v19
+
+      with:
+
+          files: |
+
+            docker
+
+    - name: List all changed files
+
+      run: |
+
+        for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+
+          echo "$file was changed"
+
+        done
+
+       
+
+    - name: Automated Version Bump
+
+      id: version-bump
+
+      uses: 'phips28/gh-action-bump-version@master'
+
+      env:
+
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+       
+
+    - name: Output Step
+
+      env:
+
+        NEW_TAG: ${{ steps.version-bump.outputs.newTag }}
+
+      run: echo "new tag $NEW_TAG"
+
+ 
+
+    - name: Configure AWS credentials
+
+      uses: aws-actions/configure-aws-credentials@v1
+
+      with:
+
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+        aws-region: ap-south-1
+
+ 
+
+    - name: Login to Amazon ECR
+
+      id: login-ecr
+
+      uses: aws-actions/amazon-ecr-login@v1
+
+ 
+
+    - name: Build, tag, and push image to Amazon ECR
+
+      env:
+
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+
+        ECR_REPOSITORY: loan-service
+
+        IMAGE_TAG: ${{ steps.version-bump.outputs.newTag }}
+
+      run: |
+
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
